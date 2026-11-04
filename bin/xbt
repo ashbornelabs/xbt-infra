@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Drives the XBT regtest environment. Run `bin/xbt -h` for usage.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly ROOT
+readonly KNOTS_CONF=/etc/bitcoin/bitcoin.conf
+readonly MINER_WALLET=miner
+
+usage() {
+  cat <<'EOF'
+Usage: bin/xbt <command> [arguments]
+
+Commands:
+  up                     Build and start the environment, then mine the initial blocks.
+  down                   Stop the environment and delete its data.
+  status                 Show the containers and the state of the chain.
+  cli <args...>          Run bitcoin-cli on the Knots node.
+  mine <blocks> [addr]   Mine blocks, to the miner wallet unless an address is given.
+  fund <addr> <amount>   Send an amount in BTC from the miner wallet and confirm it.
+  logs [service...]      Show the logs of the containers.
+
+Settings are read from .env, then from .env.local if it exists.
+EOF
+}
+
+die() {
+  echo "xbt: $*" >&2
+  exit 1
+}
+
+# The env files only assign variables, which compose reads too: there is no shell code to follow in them.
+# shellcheck disable=SC1091
+load_env() {
+  set -a
+  . "$ROOT/.env"
+  if [[ -f "$ROOT/.env.local" ]]; then
+    . "$ROOT/.env.local"
+  fi
+  set +a
+}
+
+compose() {
+  local env_files=(--env-file "$ROOT/.env")
+  if [[ -f "$ROOT/.env.local" ]]; then
+    env_files+=(--env-file "$ROOT/.env.local")
+  fi
+  docker compose --project-directory "$ROOT" "${env_files[@]}" "$@"
+}
+
+knots_cli() {
+  compose exec -T knots bitcoin-cli -conf="$KNOTS_CONF" "$@"
+}
+
+require_count() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]] || die "expected a positive number of blocks, got '$1'"
+}
+
+ensure_miner_wallet() {
+  if knots_cli listwallets | grep -q "\"$MINER_WALLET\""; then
+    return
+  fi
+  if ! knots_cli loadwallet "$MINER_WALLET" >/dev/null 2>&1; then
+    knots_cli createwallet "$MINER_WALLET" >/dev/null
+  fi
+}
+
+mine() {
+  local blocks="$1" address="${2:-}"
+  require_count "$blocks"
+  if [[ -z "$address" ]]; then
+    ensure_miner_wallet
+    address="$(knots_cli -rpcwallet="$MINER_WALLET" getnewaddress)"
+  fi
+  knots_cli generatetoaddress "$blocks" "$address" >/dev/null
+  echo "height $(knots_cli getblockcount)"
+}
+
+cmd_up() {
+  compose up --detach --build --wait
+  ensure_miner_wallet
+  local height
+  height="$(knots_cli getblockcount)"
+  if ((height < XBT_INITIAL_BLOCKS)); then
+    mine "$((XBT_INITIAL_BLOCKS - height))"
+  else
+    echo "height $height"
+  fi
+}
+
+cmd_down() {
+  compose down --volumes --remove-orphans
+}
+
+cmd_status() {
+  compose ps
+  echo "height $(knots_cli getblockcount)"
+  knots_cli getdeploymentinfo | jq -c '{blake2b, rdts: .deployments.reduced_data}'
+}
+
+cmd_fund() {
+  (($# == 2)) || die "usage: bin/xbt fund <address> <amount>"
+  ensure_miner_wallet
+  knots_cli -rpcwallet="$MINER_WALLET" sendtoaddress "$1" "$2"
+  mine 1 >/dev/null
+}
+
+main() {
+  (($# > 0)) || {
+    usage >&2
+    exit 1
+  }
+  load_env
+  local command="$1"
+  shift
+  case "$command" in
+    up) cmd_up ;;
+    down) cmd_down ;;
+    status) cmd_status ;;
+    cli) knots_cli "$@" ;;
+    mine)
+      (($# >= 1 && $# <= 2)) || die "usage: bin/xbt mine <blocks> [address]"
+      mine "$@"
+      ;;
+    fund) cmd_fund "$@" ;;
+    logs) compose logs "$@" ;;
+    -h | --help | help) usage ;;
+    *) die "unknown command '$command' (see bin/xbt -h)" ;;
+  esac
+}
+
+main "$@"
