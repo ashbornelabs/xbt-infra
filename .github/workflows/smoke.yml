@@ -1,0 +1,33 @@
+name: Smoke tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  regtest:
+    name: Regtest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Start the environment
+        run: bin/xbt up
+
+      - name: Check the BLAKE2b activation
+        run: checks/activation.sh
+
+      - name: Show the logs
+        if: failure()
+        run: bin/xbt logs
+
+      - name: Stop the environment
+        if: always()
+        run: bin/xbt down
