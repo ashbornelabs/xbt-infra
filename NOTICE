@@ -1,0 +1,8 @@
+xbt-infra
+Copyright 2026 Ashborne Labs
+
+This product is licensed under the Apache License, Version 2.0. See LICENSE.
+
+It runs software from other projects, which it does not redistribute: Docker
+images and release binaries are downloaded from their publishers and remain
+under their own licenses.

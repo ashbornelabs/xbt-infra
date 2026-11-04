@@ -1,0 +1,14 @@
+# Local overrides of .env
+.env.local
+
+# Logs collected by bin/xbt logs
+logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
