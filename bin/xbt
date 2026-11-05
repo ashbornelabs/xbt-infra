@@ -6,16 +6,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
 readonly KNOTS_CONF=/etc/bitcoin/bitcoin.conf
 readonly MINER_WALLET=miner
+readonly INTEROP_PROFILE=interop
 
 usage() {
   cat <<'EOF'
 Usage: bin/xbt <command> [arguments]
 
 Commands:
-  up                     Build and start the environment, then mine the initial blocks.
+  up [--interop]         Build and start the environment, then mine the initial blocks.
+                         --interop also starts the Lightning nodes.
   down                   Stop the environment and delete its data.
   status                 Show the containers and the state of the chain.
   cli <args...>          Run bitcoin-cli on the Knots node.
+  cln <args...>          Run lightning-cli on the Core Lightning node.
   mine <blocks> [addr]   Mine blocks, to the miner wallet unless an address is given.
   fund <addr> <amount>   Send an amount in BTC from the miner wallet and confirm it.
   logs [service...]      Show the logs of the containers.
@@ -53,6 +56,10 @@ knots_cli() {
     -rpcuser="$XBT_RPC_USER" -rpcpassword="$XBT_RPC_PASSWORD" "$@"
 }
 
+cln_cli() {
+  compose exec -T cln lightning-cli --network=regtest "$@"
+}
+
 require_count() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]] || die "expected a positive number of blocks, got '$1'"
 }
@@ -78,6 +85,12 @@ mine() {
 }
 
 cmd_up() {
+  local profiles=""
+  case "${1:-}" in
+    "") ;;
+    --interop) profiles="$INTEROP_PROFILE" ;;
+    *) die "usage: bin/xbt up [--interop]" ;;
+  esac
   # Knots stays in initial block download until it has blocks, and the other services wait for it to
   # leave it: mine first, then start them.
   compose up --detach --build --wait knots
@@ -89,11 +102,12 @@ cmd_up() {
   else
     echo "height $height"
   fi
-  compose up --detach --build --wait
+  COMPOSE_PROFILES="$profiles" compose up --detach --build --wait
 }
 
 cmd_down() {
-  compose down --volumes --remove-orphans
+  # Name every profile, so that services started with one are removed too.
+  COMPOSE_PROFILES="$INTEROP_PROFILE" compose down --volumes --remove-orphans
 }
 
 cmd_status() {
@@ -118,10 +132,11 @@ main() {
   local command="$1"
   shift
   case "$command" in
-    up) cmd_up ;;
+    up) cmd_up "$@" ;;
     down) cmd_down ;;
     status) cmd_status ;;
     cli) knots_cli "$@" ;;
+    cln) cln_cli "$@" ;;
     mine)
       (($# >= 1 && $# <= 2)) || die "usage: bin/xbt mine <blocks> [address]"
       mine "$@"
