@@ -136,6 +136,25 @@ Every version is pinned in `.env`.
 
 Then run `bin/xbt down`, `bin/xbt up --interop` and every check.
 
+## Continuous integration
+
+The `Smoke tests` workflow runs on every pull request and on pushes to `master`, on amd64. It has three jobs:
+
+- **Lint**: `shellcheck`, `hadolint`, `actionlint`, `ruff` and `docker compose config`.
+- **Regtest**: starts the environment and runs the activation and Electrum checks.
+- **Lightning interoperability**: starts the environment with `--interop` and runs the interoperability check.
+
 ## License
 
 xbt-infra is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
+
+It runs software from other projects without redistributing it. The Knots image is built from the release binaries that the Knots project publishes, and the other images are pulled from their publishers. Each keeps its own license:
+
+| Project | License |
+|---|---|
+| [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) | MIT |
+| [Fulcrum](https://github.com/privkeyio/Fulcrum) | GPL-3.0 or later |
+| [Core Lightning fork](https://github.com/privkeyio/lightning) | BSD-MIT |
+| [Lightning Fork](https://github.com/paulscode/lightning-fork) | MIT |
+
+xbt-infra is maintained by Ashborne Labs and is not affiliated with or endorsed by any of these projects.
