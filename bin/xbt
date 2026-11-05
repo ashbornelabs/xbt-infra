@@ -77,7 +77,9 @@ mine() {
 }
 
 cmd_up() {
-  compose up --detach --build --wait
+  # Knots stays in initial block download until it has blocks, and the other services wait for it to
+  # leave it: mine first, then start them.
+  compose up --detach --build --wait knots
   ensure_miner_wallet
   local height
   height="$(knots_cli getblockcount)"
@@ -86,6 +88,7 @@ cmd_up() {
   else
     echo "height $height"
   fi
+  compose up --detach --build --wait
 }
 
 cmd_down() {

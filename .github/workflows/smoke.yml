@@ -35,6 +35,12 @@ jobs:
           docker run --rm -v "$PWD:/repo" -w /repo
           rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
+      - name: Check the Python scripts
+        run: |
+          ruff="ghcr.io/astral-sh/ruff:0.17.3@sha256:691f37347e1693862ee3d69dbe1d77433fe2d74859339c48c1c52764fda80308"
+          docker run --rm -v "$PWD:/io" -w /io "$ruff" check checks
+          docker run --rm -v "$PWD:/io" -w /io "$ruff" format --check checks
+
       - name: Check the compose file
         run: docker compose config --quiet
 
@@ -51,6 +57,9 @@ jobs:
 
       - name: Check the BLAKE2b activation
         run: checks/activation.sh
+
+      - name: Check the Electrum server
+        run: python3 -I checks/electrum_headers.py
 
       - name: Show the logs
         if: failure()

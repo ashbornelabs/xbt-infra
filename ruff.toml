@@ -1,0 +1,14 @@
+target-version = "py310"
+line-length = 120
+
+[lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # import order
+  "UP",  # newer syntax
+  "B",   # likely bugs
+  "SIM", # simplifications
+  "ANN", # type annotations
+]
