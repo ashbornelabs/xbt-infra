@@ -102,6 +102,40 @@ It also reports whether each implementation's invoices carry `option_blake2b`.
 
 These two nodes are the reference that other implementations are tested against. Run the check whenever one of their versions changes.
 
+## Testnet4
+
+`compose.testnet4.yaml` runs Knots and Fulcrum on testnet4, which forked to BLAKE2b at height 150,308. It is separate from the regtest environment: `bin/xbt` does not manage it, and the two can run at the same time.
+
+```bash
+docker compose -f compose.testnet4.yaml up --detach
+```
+
+The first run syncs the chain, which takes hours. Fulcrum then indexes it, and reports itself healthy once it serves Electrum on `127.0.0.1:52001` (TCP) and `127.0.0.1:52002` (TLS). Knots' RPC is on `127.0.0.1:48332`, with the cookie in its datadir:
+
+```bash
+docker compose -f compose.testnet4.yaml exec knots bitcoin-cli -conf=/etc/bitcoin/bitcoin.conf -datadir=/data getblockchaininfo
+```
+
+The data persists in Docker volumes. To delete it:
+
+```bash
+docker compose -f compose.testnet4.yaml down --volumes
+```
+
+## Updating the versions
+
+Every version is pinned in `.env`.
+
+- **Knots**:
+  1. Set `KNOTS_VERSION` to the new release.
+  2. Download its `SHA256SUMS` and `SHA256SUMS.asc` from the release, and verify the signatures against the builder keys in [guix.sigs](https://github.com/bitcoinknots/guix.sigs).
+  3. Copy the sha256 of `bitcoin-<version>-x86_64-linux-gnu.tar.gz` to `KNOTS_SHA256_AMD64`, and of `bitcoin-<version>-aarch64-linux-gnu.tar.gz` to `KNOTS_SHA256_ARM64`.
+
+  The build fails if a tarball does not match.
+- **Fulcrum, Core Lightning and LND**: set the image's new tag, and its digest from `docker buildx imagetools inspect <image>:<tag>`.
+
+Then run `bin/xbt down`, `bin/xbt up --interop` and every check.
+
 ## License
 
 xbt-infra is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
