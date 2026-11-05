@@ -4,6 +4,60 @@ Docker environment to develop and test software for Bitcoin BLAKE2b (XBT), the B
 
 It runs an XBT regtest network with a Knots node, an Electrum server and Lightning nodes, so that libraries and Lightning implementations can be tested against a live chain on a developer machine and in CI.
 
+## What it runs
+
+| Service | Software | Role |
+|---|---|---|
+| `knots` | [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) 29.4.3 | The XBT node, in regtest. BLAKE2b and the RDTS (BIP 110) rules activate at height 150. |
+| `fulcrum` | [Fulcrum](https://github.com/privkeyio/Fulcrum) 2.1.4 with BLAKE2b | Electrum server for wallets and Lightning clients. |
+| `cln` | [Core Lightning fork](https://github.com/privkeyio/lightning) 26.06.9-blake2b.10 | Lightning node, with `--interop`. |
+| `lnd` | [Lightning Fork](https://github.com/paulscode/lightning-fork) 0.21.6-beta-blake2b.23 | Lightning node, with `--interop`. |
+
+The chain starts with 200 blocks: 80-byte headers up to height 149, and 164-byte version 2 headers from height 150. Clients therefore see both formats, as they do when they sync mainnet.
+
+The Knots image is built from the official release binaries, checked against their sha256. The other images are pulled from their publishers, pinned by digest.
+
+## Requirements
+
+- Docker with Compose v2: Docker Desktop on macOS or Docker Engine on Linux, on amd64 or arm64.
+- Bash, `jq` and Python 3.10 or later, to run `bin/xbt` and the checks.
+
+## Quick start
+
+```bash
+bin/xbt up
+```
+
+This builds the Knots image, starts Knots, mines 200 blocks, then starts Fulcrum. It takes about a minute the first time and a few seconds afterwards. Check that the chain crossed the fork and that Fulcrum serves it:
+
+```bash
+checks/activation.sh
+```
+
+```bash
+python3 checks/electrum_headers.py
+```
+
+Stop the environment and delete its data:
+
+```bash
+bin/xbt down
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `bin/xbt up [--interop]` | Builds and starts the environment, then mines the initial blocks. `--interop` also starts the Lightning nodes. Running it again keeps the existing chain. |
+| `bin/xbt down` | Stops the environment and deletes its data. |
+| `bin/xbt status` | Shows the containers, the height and the state of the BLAKE2b and RDTS deployments. |
+| `bin/xbt cli <args>` | Runs `bitcoin-cli` on the Knots node, for example `bin/xbt cli getblockchaininfo`. |
+| `bin/xbt mine <blocks> [address]` | Mines blocks, to the `miner` wallet unless an address is given. |
+| `bin/xbt fund <address> <amount>` | Sends an amount in BTC from the `miner` wallet and mines a block to confirm it. |
+| `bin/xbt cln <args>` | Runs `lightning-cli` on the Core Lightning node. |
+| `bin/xbt lnd <args>` | Runs `lncli` on the LND node. |
+| `bin/xbt logs [service]` | Shows the logs of the containers. |
+
 ## License
 
 xbt-infra is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
