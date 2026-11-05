@@ -31,8 +31,31 @@ services:
     networks:
       - regtest
 
+  # The image runs as root and keeps its data in a root-owned volume, so it is not run as another user.
+  fulcrum:
+    image: ${FULCRUM_IMAGE:?}
+    command: ["Fulcrum", "/etc/fulcrum/fulcrum.conf"]
+    depends_on:
+      knots:
+        condition: service_healthy
+    volumes:
+      - ./config/fulcrum.regtest.conf:/etc/fulcrum/fulcrum.conf:ro
+      - fulcrum-data:/data
+    ports:
+      - 127.0.0.1:51001:50001
+      - 127.0.0.1:51002:50002
+    healthcheck:
+      # Fulcrum opens its Electrum port once it has indexed the chain.
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 50001), 2)"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - regtest
+
 volumes:
   knots-data:
+  fulcrum-data:
 
 networks:
   regtest:
