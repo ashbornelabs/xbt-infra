@@ -58,6 +58,32 @@ bin/xbt down
 | `bin/xbt lnd <args>` | Runs `lncli` on the LND node. |
 | `bin/xbt logs [service]` | Shows the logs of the containers. |
 
+## Ports and credentials
+
+Every port is published on `127.0.0.1` only. The values match the regtest setup of ACINQ's test suites, so their integration tests can connect without changes.
+
+| Service | Port | Use |
+|---|---|---|
+| Knots | 18443 | RPC, user `foo`, password `bar` |
+| Knots | 18444 | P2P |
+| Knots | 29000 / 29001 / 29002 | ZMQ `rawblock` / `rawtx` / `hashblock` |
+| Fulcrum | 51001 / 51002 | Electrum over TCP / TLS, with a self-signed certificate |
+| Core Lightning | 19735 | P2P |
+| LND | 19736 | P2P |
+
+The RPC credentials are only safe because the node runs regtest and listens on `127.0.0.1`. Never use them on another network.
+
+## Settings
+
+`.env` holds the versions, image digests, credentials and chain parameters, and `compose.yaml` and `bin/xbt` read them from there. To change one locally, set it in `.env.local`, which is not committed. For example, to activate BLAKE2b at height 500 and start with 600 blocks:
+
+```
+XBT_BLAKE2B_HEIGHT=500
+XBT_INITIAL_BLOCKS=600
+```
+
+Run `bin/xbt down` before changing the chain parameters: they only apply to a new chain.
+
 ## License
 
 xbt-infra is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
