@@ -49,7 +49,8 @@ compose() {
 }
 
 knots_cli() {
-  compose exec -T knots bitcoin-cli -conf="$KNOTS_CONF" "$@"
+  compose exec -T knots bitcoin-cli -conf="$KNOTS_CONF" \
+    -rpcuser="$XBT_RPC_USER" -rpcpassword="$XBT_RPC_PASSWORD" "$@"
 }
 
 require_count() {

@@ -14,6 +14,8 @@ services:
       - -datadir=/data
       - -testactivationheight=blake2b@${XBT_BLAKE2B_HEIGHT:?}
       - -rdtsexpiry=${XBT_RDTS_EXPIRY:?}
+      - -rpcuser=${XBT_RPC_USER:?}
+      - -rpcpassword=${XBT_RPC_PASSWORD:?}
     volumes:
       - ./config/bitcoin.regtest.conf:/etc/bitcoin/bitcoin.conf:ro
       - knots-data:/data
@@ -24,7 +26,13 @@ services:
       - 127.0.0.1:29001:29001
       - 127.0.0.1:29002:29002
     healthcheck:
-      test: ["CMD", "bitcoin-cli", "-conf=/etc/bitcoin/bitcoin.conf", "getblockchaininfo"]
+      test:
+        - CMD
+        - bitcoin-cli
+        - -conf=/etc/bitcoin/bitcoin.conf
+        - -rpcuser=${XBT_RPC_USER:?}
+        - -rpcpassword=${XBT_RPC_PASSWORD:?}
+        - getblockchaininfo
       interval: 2s
       timeout: 5s
       retries: 30
@@ -35,6 +43,9 @@ services:
   fulcrum:
     image: ${FULCRUM_IMAGE:?}
     command: ["Fulcrum", "/etc/fulcrum/fulcrum.conf"]
+    environment:
+      RPCUSER: ${XBT_RPC_USER:?}
+      RPCPASSWORD: ${XBT_RPC_PASSWORD:?}
     depends_on:
       knots:
         condition: service_healthy
