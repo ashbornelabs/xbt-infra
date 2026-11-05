@@ -84,6 +84,24 @@ XBT_INITIAL_BLOCKS=600
 
 Run `bin/xbt down` before changing the chain parameters: they only apply to a new chain.
 
+## Lightning interoperability
+
+`bin/xbt up --interop` also starts a Core Lightning node and an LND node, the two Lightning implementations that already run channels on XBT. Then:
+
+```bash
+python3 checks/interop.py
+```
+
+It funds both nodes, connects them, opens a channel from Core Lightning to LND, pays an invoice in each direction and closes the channel cooperatively. Along the way it checks the rules of the [XBT Lightning specification](https://github.com/lightning-blake2b/bolts):
+
+- both nodes advertise `option_blake2b` (feature bit 512) and `option_unified_sigs` (514/515);
+- the channel type is `static_remotekey`, `anchors` and `unified_sigs` (bits 12, 22 and 514);
+- both signatures of the closing transaction use `SIGHASH_ALL_UNIFIED` (`0x21`).
+
+It also reports whether each implementation's invoices carry `option_blake2b`.
+
+These two nodes are the reference that other implementations are tested against. Run the check whenever one of their versions changes.
+
 ## License
 
 xbt-infra is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
