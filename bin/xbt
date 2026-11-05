@@ -19,6 +19,7 @@ Commands:
   status                 Show the containers and the state of the chain.
   cli <args...>          Run bitcoin-cli on the Knots node.
   cln <args...>          Run lightning-cli on the Core Lightning node.
+  lnd <args...>          Run lncli on the LND node.
   mine <blocks> [addr]   Mine blocks, to the miner wallet unless an address is given.
   fund <addr> <amount>   Send an amount in BTC from the miner wallet and confirm it.
   logs [service...]      Show the logs of the containers.
@@ -58,6 +59,10 @@ knots_cli() {
 
 cln_cli() {
   compose exec -T cln lightning-cli --network=regtest "$@"
+}
+
+lnd_cli() {
+  compose exec -T lnd lncli --network=regtest "$@"
 }
 
 require_count() {
@@ -137,6 +142,7 @@ main() {
     status) cmd_status ;;
     cli) knots_cli "$@" ;;
     cln) cln_cli "$@" ;;
+    lnd) lnd_cli "$@" ;;
     mine)
       (($# >= 1 && $# <= 2)) || die "usage: bin/xbt mine <blocks> [address]"
       mine "$@"

@@ -96,10 +96,47 @@ services:
     networks:
       - regtest
 
+  lnd:
+    image: ${LND_IMAGE:?}
+    profiles: [interop]
+    command:
+      - --bitcoin.regtest
+      - --bitcoin.node=bitcoind
+      - --bitcoin.blake2b-activation-height=${XBT_BLAKE2B_HEIGHT:?}
+      - --bitcoind.rpchost=knots:18443
+      - --bitcoind.rpcuser=${XBT_RPC_USER:?}
+      - --bitcoind.rpcpass=${XBT_RPC_PASSWORD:?}
+      - --bitcoind.zmqpubrawblock=tcp://knots:29000
+      - --bitcoind.zmqpubrawtx=tcp://knots:29001
+      - --protocol.splice
+      # Create and unlock the wallet without a seed backup: regtest funds are disposable.
+      - --noseedbackup
+      # Regtest has no public peers to discover.
+      - --nobootstrap
+      - --alias=lnd
+      - --listen=0.0.0.0:9735
+      - --rpclisten=0.0.0.0:10009
+      - --tlsextradomain=lnd
+    depends_on:
+      knots:
+        condition: service_healthy
+    volumes:
+      - lnd-data:/root/.lnd
+    ports:
+      - 127.0.0.1:19736:9735
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - regtest
+
 volumes:
   knots-data:
   fulcrum-data:
   cln-data:
+  lnd-data:
 
 networks:
   regtest:
