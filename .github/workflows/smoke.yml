@@ -68,3 +68,25 @@ jobs:
       - name: Stop the environment
         if: always()
         run: bin/xbt down
+
+  interop:
+    name: Lightning interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Start the environment with the Lightning nodes
+        run: bin/xbt up --interop
+
+      - name: Check a channel between Core Lightning and LND
+        run: python3 -I checks/interop.py
+
+      - name: Show the logs
+        if: failure()
+        run: bin/xbt logs
+
+      - name: Stop the environment
+        if: always()
+        run: bin/xbt down
