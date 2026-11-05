@@ -1,0 +1,38 @@
+name: xbt
+
+services:
+  knots:
+    build:
+      context: images/knots
+      args:
+        KNOTS_VERSION: ${KNOTS_VERSION:?}
+        KNOTS_SHA256_AMD64: ${KNOTS_SHA256_AMD64:?}
+        KNOTS_SHA256_ARM64: ${KNOTS_SHA256_ARM64:?}
+    image: xbt-infra/knots:${KNOTS_VERSION:?}
+    command:
+      - -conf=/etc/bitcoin/bitcoin.conf
+      - -datadir=/data
+      - -testactivationheight=blake2b@${XBT_BLAKE2B_HEIGHT:?}
+      - -rdtsexpiry=${XBT_RDTS_EXPIRY:?}
+    volumes:
+      - ./config/bitcoin.regtest.conf:/etc/bitcoin/bitcoin.conf:ro
+      - knots-data:/data
+    ports:
+      - 127.0.0.1:18443:18443
+      - 127.0.0.1:18444:18444
+      - 127.0.0.1:29000:29000
+      - 127.0.0.1:29001:29001
+      - 127.0.0.1:29002:29002
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-conf=/etc/bitcoin/bitcoin.conf", "getblockchaininfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - regtest
+
+volumes:
+  knots-data:
+
+networks:
+  regtest:
