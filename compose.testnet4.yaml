@@ -1,0 +1,56 @@
+# Knots and Fulcrum on testnet4, which forked to BLAKE2b at height 150,308. Separate from the regtest
+# environment: run it with `docker compose -f compose.testnet4.yaml up --detach`. Its data persists in named
+# volumes until removed with `docker compose -f compose.testnet4.yaml down --volumes`.
+name: xbt-testnet4
+
+services:
+  knots:
+    build:
+      context: images/knots
+      args:
+        KNOTS_VERSION: ${KNOTS_VERSION:?}
+        KNOTS_SHA256_AMD64: ${KNOTS_SHA256_AMD64:?}
+        KNOTS_SHA256_ARM64: ${KNOTS_SHA256_ARM64:?}
+    image: xbt-infra/knots:${KNOTS_VERSION:?}
+    command:
+      - -conf=/etc/bitcoin/bitcoin.conf
+      - -datadir=/data
+    volumes:
+      - ./config/bitcoin.testnet4.conf:/etc/bitcoin/bitcoin.conf:ro
+      - knots-data:/data
+    ports:
+      - 127.0.0.1:48332:48332
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-conf=/etc/bitcoin/bitcoin.conf", "-datadir=/data", "getblockchaininfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # The image runs as root, which lets it read the cookie Knots writes as uid 10001.
+  fulcrum:
+    image: ${FULCRUM_IMAGE:?}
+    command: ["Fulcrum", "/etc/fulcrum/fulcrum.conf", "--rpccookie", "/knots/testnet4/.cookie"]
+    depends_on:
+      knots:
+        condition: service_healthy
+    volumes:
+      - ./config/fulcrum.testnet4.conf:/etc/fulcrum/fulcrum.conf:ro
+      - knots-data:/knots:ro
+      - fulcrum-data:/data
+    ports:
+      - 127.0.0.1:52001:50001
+      - 127.0.0.1:52002:50002
+    healthcheck:
+      # Fulcrum opens its Electrum port once Knots has synced and Fulcrum has indexed the chain, which takes
+      # hours on a first run: it reports "starting" until then.
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 50001), 2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 12h
+    restart: unless-stopped
+
+volumes:
+  knots-data:
+  fulcrum-data:
