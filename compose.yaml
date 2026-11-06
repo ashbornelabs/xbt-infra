@@ -14,6 +14,8 @@ services:
       - -datadir=/data
       - -testactivationheight=blake2b@${XBT_BLAKE2B_HEIGHT:?}
       - -rdtsexpiry=${XBT_RDTS_EXPIRY:?}
+      - -rpcuser=${XBT_RPC_USER:?}
+      - -rpcpassword=${XBT_RPC_PASSWORD:?}
     volumes:
       - ./config/bitcoin.regtest.conf:/etc/bitcoin/bitcoin.conf:ro
       - knots-data:/data
@@ -24,7 +26,13 @@ services:
       - 127.0.0.1:29001:29001
       - 127.0.0.1:29002:29002
     healthcheck:
-      test: ["CMD", "bitcoin-cli", "-conf=/etc/bitcoin/bitcoin.conf", "getblockchaininfo"]
+      test:
+        - CMD
+        - bitcoin-cli
+        - -conf=/etc/bitcoin/bitcoin.conf
+        - -rpcuser=${XBT_RPC_USER:?}
+        - -rpcpassword=${XBT_RPC_PASSWORD:?}
+        - getblockchaininfo
       interval: 2s
       timeout: 5s
       retries: 30
@@ -35,6 +43,9 @@ services:
   fulcrum:
     image: ${FULCRUM_IMAGE:?}
     command: ["Fulcrum", "/etc/fulcrum/fulcrum.conf"]
+    environment:
+      RPCUSER: ${XBT_RPC_USER:?}
+      RPCPASSWORD: ${XBT_RPC_PASSWORD:?}
     depends_on:
       knots:
         condition: service_healthy
@@ -53,9 +64,79 @@ services:
     networks:
       - regtest
 
+  # Lightning nodes for interoperability tests, started by `bin/xbt up --interop`. Their images run as root.
+  cln:
+    image: ${CLN_IMAGE:?}
+    profiles: [interop]
+    environment:
+      LIGHTNINGD_NETWORK: regtest
+    command:
+      - --developer
+      - --dev-blake2b-activation-height=${XBT_BLAKE2B_HEIGHT:?}
+      # Check the node for new blocks every second instead of every 30.
+      - --dev-bitcoind-poll=1
+      - --alias=cln
+      - --addr=0.0.0.0:9735
+      - --bitcoin-rpcconnect=knots
+      - --bitcoin-rpcport=18443
+      - --bitcoin-rpcuser=${XBT_RPC_USER:?}
+      - --bitcoin-rpcpassword=${XBT_RPC_PASSWORD:?}
+    depends_on:
+      knots:
+        condition: service_healthy
+    volumes:
+      - cln-data:/root/.lightning
+    ports:
+      - 127.0.0.1:19735:9735
+    healthcheck:
+      test: ["CMD", "lightning-cli", "--network=regtest", "getinfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - regtest
+
+  lnd:
+    image: ${LND_IMAGE:?}
+    profiles: [interop]
+    command:
+      - --bitcoin.regtest
+      - --bitcoin.node=bitcoind
+      - --bitcoin.blake2b-activation-height=${XBT_BLAKE2B_HEIGHT:?}
+      - --bitcoind.rpchost=knots:18443
+      - --bitcoind.rpcuser=${XBT_RPC_USER:?}
+      - --bitcoind.rpcpass=${XBT_RPC_PASSWORD:?}
+      - --bitcoind.zmqpubrawblock=tcp://knots:29000
+      - --bitcoind.zmqpubrawtx=tcp://knots:29001
+      - --protocol.splice
+      # Create and unlock the wallet without a seed backup: regtest funds are disposable.
+      - --noseedbackup
+      # Regtest has no public peers to discover.
+      - --nobootstrap
+      - --alias=lnd
+      - --listen=0.0.0.0:9735
+      - --rpclisten=0.0.0.0:10009
+      - --tlsextradomain=lnd
+    depends_on:
+      knots:
+        condition: service_healthy
+    volumes:
+      - lnd-data:/root/.lnd
+    ports:
+      - 127.0.0.1:19736:9735
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "getinfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - regtest
+
 volumes:
   knots-data:
   fulcrum-data:
+  cln-data:
+  lnd-data:
 
 networks:
   regtest:
